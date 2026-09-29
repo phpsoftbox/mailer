@@ -6,16 +6,17 @@ namespace PhpSoftBox\Mailer\Support;
 
 use InvalidArgumentException;
 
-use function base64_encode;
-use function function_exists;
 use function mb_encode_mimeheader;
 use function preg_match;
-use function sprintf;
 use function str_contains;
 use function trim;
 
 final class EmailAddress
 {
+    /**
+     * Mailbox-часть адреса (`user@example.com`) для SMTP envelope: из `Name <user@example.com>` берётся часть в
+     * угловых скобках. Переводы строк, пробелы и угловые скобки в mailbox запрещены.
+     */
     public static function mailbox(string $address): string
     {
         $address = self::clean($address);
@@ -31,9 +32,18 @@ final class EmailAddress
             throw new InvalidArgumentException('Email mailbox must not be empty.');
         }
 
+        if (preg_match('/[\s<>]/', $address) === 1) {
+            throw new InvalidArgumentException('Email mailbox must not contain whitespace or angle brackets.');
+        }
+
         return $address;
     }
 
+    /**
+     * Значение адреса для MIME-заголовка (From, To, Cc, Reply-To): `user@example.com` или
+     * `Name <user@example.com>`. Отображаемое имя берётся из `$displayName` или из адреса вида
+     * `Name <user@example.com>` и кодируется по RFC 2047, если содержит не только простые ASCII-символы.
+     */
     public static function header(string $address, ?string $displayName = null): string
     {
         $address = self::clean($address);
@@ -42,11 +52,17 @@ final class EmailAddress
         }
 
         $displayName = self::clean($displayName ?? '');
-        if ($displayName === '') {
-            return $address;
+        if ($displayName === '' && preg_match('/^(.*?)\s*<([^<>]+)>$/', $address, $matches) === 1) {
+            $displayName = trim($matches[1], " \t\"");
+            $address     = $matches[2];
         }
 
-        return self::encodeDisplayName($displayName) . ' <' . self::mailbox($address) . '>';
+        $mailbox = self::mailbox($address);
+        if ($displayName === '') {
+            return $mailbox;
+        }
+
+        return self::encodeDisplayName($displayName) . ' <' . $mailbox . '>';
     }
 
     private static function clean(string $value): string
@@ -65,10 +81,6 @@ final class EmailAddress
             return $value;
         }
 
-        if (function_exists('mb_encode_mimeheader')) {
-            return mb_encode_mimeheader($value, 'UTF-8', 'B');
-        }
-
-        return sprintf('=?UTF-8?B?%s?=', base64_encode($value));
+        return mb_encode_mimeheader($value, 'UTF-8', 'B', "\r\n");
     }
 }

@@ -6,6 +6,7 @@ namespace PhpSoftBox\Mailer\Smtp;
 
 use PhpSoftBox\Mailer\Contracts\SmtpClientInterface;
 use RuntimeException;
+use SensitiveParameter;
 use Throwable;
 
 use function base64_encode;
@@ -126,7 +127,7 @@ final class SmtpClient implements SmtpClientInterface
         }
     }
 
-    public function authLogin(string $username, string $password): void
+    public function authLogin(string $username, #[SensitiveParameter] string $password): void
     {
         $this->command('AUTH LOGIN', [334]);
         $this->command(base64_encode($username), [334]);
@@ -170,15 +171,17 @@ final class SmtpClient implements SmtpClientInterface
     }
 
     /**
+     * Команда скрыта в трассировке исключений: при AUTH LOGIN это base64 логина и пароля.
+     *
      * @param list<int> $expected
      */
-    private function command(string $command, array $expected): void
+    private function command(#[SensitiveParameter] string $command, array $expected): void
     {
         $this->write($command . "\r\n");
         $this->expect($expected);
     }
 
-    private function write(string $payload): void
+    private function write(#[SensitiveParameter] string $payload): void
     {
         if (!is_resource($this->stream)) {
             throw new RuntimeException('SMTP stream is not connected.');

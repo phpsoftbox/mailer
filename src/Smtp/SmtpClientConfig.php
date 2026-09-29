@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace PhpSoftBox\Mailer\Smtp;
 
+use SensitiveParameter;
+
 final readonly class SmtpClientConfig
 {
     public function __construct(
         public string $host,
         public int $port = 25,
         public ?string $username = null,
+        #[SensitiveParameter]
         public ?string $password = null,
         public string $encryption = 'none', // none|tls|ssl
         public string $helo = 'localhost',
