@@ -13,6 +13,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversMethod;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 #[CoversClass(SmtpEmailTransport::class)]
 #[CoversClass(EmailAddress::class)]
@@ -129,5 +130,67 @@ final class SmtpEmailTransportTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         $transport->send(EmailMessage::create('Subject'), $payload);
+    }
+
+    /**
+     * Проверим, что при отказе сервера в середине транзакции соединение закрывается (QUIT), а ошибка пробрасывается.
+     *
+     * @see SmtpEmailTransport::send()
+     */
+    #[Test]
+    public function rejectedTransactionClosesConnection(): void
+    {
+        $client = new FakeSmtpClient();
+
+        $client->rejectRecipient = 'bad@example.com';
+
+        $transport = new SmtpEmailTransport($client, 'no-reply@example.com');
+
+        try {
+            $transport->send(EmailMessage::create('Subject'), $this->payload(['bad@example.com']));
+            self::fail('Expected SMTP rejection.');
+        } catch (RuntimeException $exception) {
+            $this->assertStringContainsString('550', $exception->getMessage());
+        }
+
+        $this->assertSame(['connect', 'mailFrom:no-reply@example.com', 'rcptTo:bad@example.com', 'quit'], $client->calls);
+    }
+
+    /**
+     * Проверим, что недопустимый адрес получателя отклоняется до соединения с SMTP-сервером.
+     *
+     * @see SmtpEmailTransport::send()
+     */
+    #[Test]
+    public function invalidRecipientIsRejectedBeforeConnect(): void
+    {
+        $client = new FakeSmtpClient();
+
+        $transport = new SmtpEmailTransport($client, 'no-reply@example.com');
+
+        try {
+            $transport->send(EmailMessage::create('Subject'), $this->payload(["user@example.com\r\nBcc: victim@example.com"]));
+            self::fail('Expected invalid recipient.');
+        } catch (InvalidArgumentException) {
+        }
+
+        $this->assertSame([], $client->calls);
+    }
+
+    /**
+     * @param list<string> $to
+     */
+    private function payload(array $to): EmailPayload
+    {
+        return new EmailPayload(
+            to: $to,
+            cc: [],
+            bcc: [],
+            from: null,
+            replyTo: null,
+            subject: 'Subject',
+            text: 'Hello',
+            html: null,
+        );
     }
 }

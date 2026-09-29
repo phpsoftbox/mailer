@@ -13,11 +13,15 @@
         "sort-packages": true
     },
     "require": {
-        "php": "^8.5"
+        "php": "^8.5",
+        "ext-mbstring": "*"
     },
     "require-dev": {
         "phpsoftbox/cs-fixer": "^1.2.1",
         "phpunit/phpunit": "^13.3"
+    },
+    "suggest": {
+        "ext-openssl": "Required for SMTP encryption tls/ssl."
     },
     "autoload": {
         "psr-4": {

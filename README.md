@@ -33,6 +33,22 @@ $channel = new EmailChannel($transport, /* markdown */ null, /* renderer */ null
 Если транспорт используется без `EmailChannel`, отображаемое имя можно задать отдельно через
 `defaultFromName`.
 
+## Формат письма и безопасность
+
+- Письмо собирает `PhpSoftBox\Mailer\Mime\MimeMessageBuilder` (общий для SMTP и file-транспорта).
+- Адреса `From`, `To`, `Cc`, `Reply-To` проходят через `EmailAddress`: перевод строки в адресе, а также пробел
+  или угловые скобки в mailbox — `InvalidArgumentException` (защита от внедрения заголовков и параметров
+  SMTP-команд). Адреса проверяются до соединения с SMTP-сервером.
+- Отображаемое имя (`Иван <ivan@example.com>` или `defaultFromName`) и тема с не-ASCII символами кодируются
+  по RFC 2047.
+- Тело (text и html) передаётся в `Content-Transfer-Encoding: quoted-printable`: строки не длиннее 76 символов,
+  не нужен 8BITMIME у сервера. Для просмотра `.eml` из file-транспорта используйте почтовый клиент или MailHog.
+- Если сервер отклонил транзакцию (MAIL FROM/RCPT TO/DATA), транспорт отправляет `QUIT` и пробрасывает ошибку.
+- Пароль SMTP помечен `#[SensitiveParameter]` (в `SmtpClientConfig` и `authLogin()`), команды SMTP-клиента не
+  попадают в аргументы трассировки исключений — base64 логина и пароля не утекает в лог ошибок.
+
+Требования: `ext-mbstring`; для `encryption: tls|ssl` — `ext-openssl`.
+
 ## File transport
 
 Для локальной отладки можно сохранять письма в файлы:

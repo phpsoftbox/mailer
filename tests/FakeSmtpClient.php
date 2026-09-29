@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PhpSoftBox\Mailer\Tests;
 
 use PhpSoftBox\Mailer\Contracts\SmtpClientInterface;
+use RuntimeException;
 
 final class FakeSmtpClient implements SmtpClientInterface
 {
@@ -19,6 +20,11 @@ final class FakeSmtpClient implements SmtpClientInterface
     public array $rcpt = [];
 
     public ?string $payload = null;
+
+    /**
+     * Адрес, на котором RCPT TO завершится ошибкой сервера.
+     */
+    public ?string $rejectRecipient = null;
 
     public function connect(): void
     {
@@ -48,7 +54,11 @@ final class FakeSmtpClient implements SmtpClientInterface
     public function rcptTo(string $address): void
     {
         $this->calls[] = 'rcptTo:' . $address;
-        $this->rcpt[]  = $address;
+        if ($address === $this->rejectRecipient) {
+            throw new RuntimeException('Unexpected SMTP response: 550 mailbox unavailable');
+        }
+
+        $this->rcpt[] = $address;
     }
 
     public function data(string $data): void

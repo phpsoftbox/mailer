@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PhpSoftBox\Mailer\Contracts;
 
+use SensitiveParameter;
+
 interface SmtpClientInterface
 {
     public function connect(): void;
@@ -12,7 +14,7 @@ interface SmtpClientInterface
 
     public function startTls(): void;
 
-    public function authLogin(string $username, string $password): void;
+    public function authLogin(string $username, #[SensitiveParameter] string $password): void;
 
     public function mailFrom(string $address): void;
 
